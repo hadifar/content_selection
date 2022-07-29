@@ -1,4 +1,5 @@
-import argparse
+import datetime
+import datetime
 import json
 import logging
 import os
@@ -6,14 +7,15 @@ import sys
 from dataclasses import dataclass, field
 from typing import Optional
 
-from sklearn.metrics import accuracy_score, f1_score
-from transformers import AutoModelForSequenceClassification, AutoTokenizer, TrainingArguments, Trainer, AutoConfig, \
-    RobertaForSequenceClassification, default_data_collator
+from sklearn.metrics import accuracy_score, f1_score, precision_recall_fscore_support
+from transformers import AutoTokenizer, TrainingArguments, Trainer, AutoConfig, \
+    AutoModelForSequenceClassification
 from transformers import (
     HfArgumentParser)
 from transformers.trainer_utils import get_last_checkpoint, set_seed
 
 from data_helper import read_data
+from model import RobertaCRF
 
 logger = logging.getLogger(__name__)
 
@@ -147,8 +149,30 @@ class DataTrainingArguments:
         },
     )
 
+    # crf: Optional[int] = field(
+    #     default=1,
+    #     metadata={
+    #         "help": ("content selection as a sequence labeling problem")
+    #     },
+    # )
+
 
 def set_loggers(training_args):
+    time = datetime.datetime.now()
+
+    output_dir = "./results/results_{}_{}_{}_{}_ep{}_lr{}_seed{}".format(
+        # training_args.task,
+        time.month,
+        time.day,
+        time.hour,
+        time.minute,
+        # args.experiment,
+        # args.model_name.split('/')[0],
+        str(training_args.num_train_epochs),
+        str(training_args.learning_rate),
+        str(training_args.seed),
+    )
+
     # Setup logging
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
@@ -171,6 +195,54 @@ def set_loggers(training_args):
 
     # disable wandb console logs
     logging.getLogger('wandb.run_manager').setLevel(logging.WARNING)
+
+    log_dir = output_dir + '/logs'
+    return output_dir, log_dir
+
+
+import numpy as np
+
+
+#
+# def compute_metrics(pred):
+#     # *_, ls = pred.label_ids.shape
+#     pred_label = pred.label_ids.flatten()
+#     pred_pred = pred.predictions.flatten()
+#     labels = np.delete(pred_label, np.where(pred_label == -100))
+#     preds = np.delete(pred_pred, np.where(pred_pred == -100))
+#     # labels = np.reshape(pred.label_ids[np.where(pred.label_ids != -100)], (-1, ls))
+#     # preds = np.reshape(pred.predictions[np.where(pred.predictions != -100)], (-1, ls))
+#     # labels = [item[np.where(item != -100)] for item in pred.label_ids]
+#     # preds = [item[np.where(item != -100)] for item in pred.predictions]
+#     # precision_binary, recall_binary, f1_binary, _ = precision_recall_fscore_support(labels, preds)
+#     precision_macro, recall_macro, f1_macro, _ = precision_recall_fscore_support(labels, preds, average='macro')
+#     precision_micro, recall_micro, f1_micro, _ = precision_recall_fscore_support(labels, preds, average='micro')
+#     precision_w, recall_w, f1_w, _ = precision_recall_fscore_support(labels, preds, average='weighted')
+#     #
+#     #     print(classification_report(labels, preds, labels=le.transform(le.classes_), target_names=le.classes_.tolist()))
+#     #     precision_s, recall_s, f1_s = 0., 0., 0.
+#     # else:
+#     #     precision_s, recall_s, f1_s, _ = precision_recall_fscore_support(labels, preds, average='samples')
+#
+#     return {
+#         # 'precision_sampled': precision_s,
+#         # 'recall_sampled': recall_s,
+#         # 'f1_sampled': f1_s,
+#
+#         'precision_micro': precision_micro,
+#         'recall_micro': recall_micro,
+#         'f1_micro': f1_micro,
+#
+#         'precision_macro': precision_macro,
+#         'recall_macro': recall_macro,
+#         'f1_macro': f1_macro,
+#
+#         'precision_weighted': precision_w,
+#         'recall_weighted': recall_w,
+#         'f1_weighted': f1_w,
+#
+#         'accuracy': accuracy_score(labels, preds)
+#     }
 
 
 def compute_metrics(pred):
@@ -210,7 +282,8 @@ def main(args_file=None):
         )
 
     # set seed & init logger
-    set_loggers(training_args)
+    output_dir, logdir = set_loggers(training_args)
+    cache_dir = "/".join(output_dir.split('/')[:-1]) + '/cache/'
 
     # Detecting last checkpoint.
     last_checkpoint = None
@@ -230,39 +303,46 @@ def main(args_file=None):
     # Load pretrained model and tokenizer
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
-        cache_dir=model_args.cache_dir,
+        cache_dir=cache_dir,
         use_fast=model_args.use_fast_tokenizer,
         revision=model_args.model_revision,
         model_max_length=512,
         # use_auth_token=True if model_args.use_auth_token else None,
     )
 
+    # ATTR_TO_SPECIAL_TOKEN = {'additional_special_tokens': ['[LABEL_0]', '[LABEL_1]'], 'pad_token': '[PAD]'}
+    # orig_num_tokens = len(tokenizer)
+    # num_added_tokens = tokenizer.add_special_tokens(ATTR_TO_SPECIAL_TOKEN)
+
     train_ds, valid_ds = read_data(data_args, tokenizer)
     if data_args.is_debug_mode == 1:
         print('tokenization finished...')
         config = AutoConfig.from_pretrained(model_args.model_name_or_path)
         config.num_labels = 1
-        config.hidden_size = 32
-        config.intermediate_size = 128
-        config.num_attention_heads = 2
         config.num_hidden_layers = 2
-        # config.n_negative = args.n_negative
-        model = RobertaForSequenceClassification(config=config)
+        config.hidden_size = 32
+        # config.intermediate_size = 128
+        config.num_attention_heads = 2
+        model = AutoModelForSequenceClassification.from_config(config)
     else:
         model = AutoModelForSequenceClassification.from_pretrained(model_args.model_name_or_path,
-                                                                   cache_dir=model_args.cache_dir,
+                                                                   cache_dir=cache_dir,
                                                                    num_labels=1)
 
+    # if num_added_tokens > 0:
+    #     model.resize_token_embeddings(new_num_tokens=orig_num_tokens + num_added_tokens)
+    # model = RobertaCRF(encoder, data_args.crf)
+
     training_args = TrainingArguments(
-        output_dir='./testtt',  # output directory
-        num_train_epochs=10,  # total number of training epochs
-        learning_rate=5e-5,
-        gradient_accumulation_steps=3,
-        per_device_train_batch_size=12,  # batch size per device during training
-        per_device_eval_batch_size=12,  # batch size for evaluation
+        output_dir=output_dir,  # output directory
+        num_train_epochs=training_args.num_train_epochs,  # total number of training epochs
+        learning_rate=training_args.learning_rate,
+        gradient_accumulation_steps=training_args.gradient_accumulation_steps,
+        per_device_train_batch_size=training_args.per_device_train_batch_size,  # batch size per device during training
+        per_device_eval_batch_size=training_args.per_device_eval_batch_size,  # batch size for evaluation
         warmup_steps=200,  # number of warmup steps for learning rate scheduler
         # weight_decay=0.01,  # strength of weight decay
-        logging_dir='./testtt/logs/',  # directory for storing logs
+        logging_dir=logdir,  # directory for storing logs
         # load_best_model_at_end=True,  # load the best model when finished training (default metric is loss)
         # but you can specify `metric_for_best_model` argument to change to accuracy or other metric
         # logging_steps=300,  # log & save weights each logging_steps
@@ -271,14 +351,17 @@ def main(args_file=None):
         greater_is_better=True,
         save_strategy="no",
         evaluation_strategy="epoch",  # evaluate each `logging_steps`
-
     )
+
+    # data_collator = DataCollatorForLanguageModeling(tokenizer, mlm=False)
 
     trainer = Trainer(
         model=model,  # the instantiated Transformers model to be trained
         args=training_args,  # training arguments, defined above
+        tokenizer=tokenizer,
         train_dataset=train_ds,  # training dataset
-        eval_dataset=train_ds,  # evaluation dataset
+        eval_dataset=valid_ds,  # evaluation dataset
+        # data_collator=data_collator,
         compute_metrics=compute_metrics,  # the callback that computes metrics of interest
     )
 
@@ -288,9 +371,15 @@ def main(args_file=None):
     ######################################################
     ######################################################
     # save results on json file
-    with open('./testtt/domain_scores.json', 'w') as outfile:
-        pred_train = [list(t.astype(float)) for t in trainer.predict(train_ds).predictions]
-        pred_valid = [list(t.astype(float)) for t in trainer.predict(valid_ds).predictions]
+    # np.delete(pred_pred, np.where(pred_pred == -100))
+    from itertools import chain
+    # with open(output_dir + '/{}_eval_scores.json'.format(output_dir.split('/')[-1]), 'w') as outfile:
+    # save results on json file
+    with open(output_dir + '/{}_eval_scores.json'.format(output_dir.split('/')[-1]), 'w') as outfile:
+        pred_train = trainer.predict(train_ds)
+        pred_valid = trainer.predict(valid_ds)
+        pred_train = [[t[0].tolist()[0], t[1]] for t in zip(pred_train.predictions, pred_train.label_ids)]
+        pred_valid = [[t[0].tolist()[0], t[1]] for t in zip(pred_valid.predictions, pred_valid.label_ids)]
 
         train_txt = tokenizer.batch_decode([item['input_ids'] for item in train_ds],
                                            skip_special_tokens=True,

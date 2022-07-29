@@ -2,6 +2,7 @@ env/
 results/
 wandb/
 cache_*
+analyze/
 
 .vscode
 experiments/

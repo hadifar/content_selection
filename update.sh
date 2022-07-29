@@ -36,7 +36,7 @@ rsync --delete --archive --verbose --compress --owner --update -e ssh $LOCAL/raw
 #rsync --delete --archive --verbose --compress --owner --update -e ssh $LOCAL/t5_qg_tokenizer/  $SERVER:$REMOTE_DIR/t5_qg_tokenizer/
 
 
-ssh hadifar@n087-09.wall2.ilabt.iminds.be sudo chmod -R 777 $REMOTE_DIR/script.sh
+#ssh hadifar@n087-09.wall2.ilabt.iminds.be sudo chmod -R 777 $REMOTE_DIR/script.sh
 ssh hadifar@n087-09.wall2.ilabt.iminds.be sudo chmod -R 777 $REMOTE_DIR/
 ssh hadifar@n087-09.wall2.ilabt.iminds.be sudo chmod -R 777 $REMOTE_DIR/raw_data/
 #done
