@@ -1,6 +1,4 @@
 import matplotlib.pyplot as plt
-import numpy as np
-
 
 recall_at_k = [0.6, 0.65, 0.5, 0.7, 0.4, 0.2, 0.8, 0.38, 0.48, 0.8]
 ADC_at_k = [0.3, 0.25, 0.15, 0.27, 0.144, 0.29, 0.81, 0.48, 0.78, 0.66]

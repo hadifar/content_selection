@@ -1,7 +1,9 @@
 import json
 
 import numpy as np
+import pandas as pd
 from tqdm import tqdm
+import argparse
 
 
 # model = SentenceTransformer('all-MiniLM-L6-v2')
@@ -151,3 +153,36 @@ def rank(initial_ranking, lambda_score):
         docs_unranked.append(curr_doc)
 
     return final_ranking
+
+
+def run_exp(initial_ranking, lambda_):
+    ranked_documents = rank(initial_ranking, lambda_)
+    chapter_rank = []
+    for r_doc in ranked_documents:
+        matched_doc_ = initial_ranking['doc'] == r_doc['doc']
+        index_id = initial_ranking.index[matched_doc_].tolist()[0]
+
+        chapter, text, rank_org, label, _ = initial_ranking.values.tolist()[index_id]
+
+        chapter_rank.append([chapter, text, rank_org, label, r_doc['mmr'], r_doc['cluster'], r_doc['cluster_scores']])
+
+    cols = ['chapter', 'text', 'score', 'label', 'mmr', 'cluster', 'cluster_scores']
+    return pd.DataFrame(chapter_rank, columns=cols)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--lambda_score', default=0.9, help='higher value of lambda means less topic diversity')
+    parser.add_argument('--input_file', default='data/rank_v2_sim_0.1.csv')
+    parser.add_argument('--output_file', default='data/rank_topic_0.9_full.csv')
+    args = parser.parse_args()
+
+    df = pd.read_csv(args.input_file)
+
+    df = [item[1].reset_index(drop=True) for item in df.groupby(by='chapter')]
+
+    list_of_df = [run_exp(item, args.lambda_score) for item in df[:2]]
+
+    df = pd.concat(list_of_df)
+
+    df.to_csv(args.output_file, index=False)

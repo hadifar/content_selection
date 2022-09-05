@@ -1,7 +1,6 @@
+from graspologic.cluster import AutoGMMCluster
 from sentence_transformers import SentenceTransformer
 import numpy as np
-
-from clustering.autogmm import AutoGMMCluster
 
 model = SentenceTransformer('all-MiniLM-L6-v2')
 

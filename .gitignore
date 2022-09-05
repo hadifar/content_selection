@@ -5,6 +5,8 @@ cache_*
 analyze/
 cache/
 
+xSQuAD/data/*
+
 .vscode
 experiments/
 
