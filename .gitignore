@@ -3,6 +3,7 @@ results/
 wandb/
 cache_*
 analyze/
+cache/
 
 .vscode
 experiments/

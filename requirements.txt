@@ -8,4 +8,8 @@ scikit-learn==0.24.2
 rouge_score==0.0.4
 sacrebleu==2.1.0
 wandb
-pytorch-crf
+tqdm==4.64.1
+pandas>=0.20.3
+scikit-learn>=0.18.1
+nltk
+graspologic==1.0.0

@@ -42,7 +42,7 @@ class ModelArguments:
         metadata={"help": "The specific model version to use (can be a branch name, tag name or commit id)."},
     )
     cache_dir: Optional[str] = field(
-        default=None, metadata={"help": "Where do you want to store the pretrained models downloaded from s3"}
+        default='cache/', metadata={"help": "Where do you want to store the pretrained models downloaded from s3"}
     )
 
 
@@ -283,7 +283,6 @@ def main(args_file=None):
 
     # set seed & init logger
     output_dir, logdir = set_loggers(training_args)
-    cache_dir = "/".join(output_dir.split('/')[:-1]) + '/cache/'
 
     # Detecting last checkpoint.
     last_checkpoint = None
@@ -303,7 +302,7 @@ def main(args_file=None):
     # Load pretrained model and tokenizer
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
-        cache_dir=cache_dir,
+        cache_dir=model_args.cache_dir,
         use_fast=model_args.use_fast_tokenizer,
         revision=model_args.model_revision,
         model_max_length=512,
@@ -314,7 +313,7 @@ def main(args_file=None):
     # orig_num_tokens = len(tokenizer)
     # num_added_tokens = tokenizer.add_special_tokens(ATTR_TO_SPECIAL_TOKEN)
 
-    train_ds, valid_ds = read_data(data_args, tokenizer)
+    train_ds, _, valid_ds, valid_raw_data = read_data(data_args, tokenizer)
     if data_args.is_debug_mode == 1:
         print('tokenization finished...')
         config = AutoConfig.from_pretrained(model_args.model_name_or_path)
@@ -326,7 +325,7 @@ def main(args_file=None):
         model = AutoModelForSequenceClassification.from_config(config)
     else:
         model = AutoModelForSequenceClassification.from_pretrained(model_args.model_name_or_path,
-                                                                   cache_dir=cache_dir,
+                                                                   cache_dir=model_args.cache_dir,
                                                                    num_labels=1)
 
     # if num_added_tokens > 0:
@@ -376,25 +375,25 @@ def main(args_file=None):
     # with open(output_dir + '/{}_eval_scores.json'.format(output_dir.split('/')[-1]), 'w') as outfile:
     # save results on json file
     with open(output_dir + '/{}_eval_scores.json'.format(output_dir.split('/')[-1]), 'w') as outfile:
-        pred_train = trainer.predict(train_ds)
+        # pred_train = trainer.predict(train_ds)
         pred_valid = trainer.predict(valid_ds)
-        pred_train = [[t[0].tolist()[0], t[1]] for t in zip(pred_train.predictions, pred_train.label_ids)]
-        pred_valid = [[t[0].tolist()[0], t[1]] for t in zip(pred_valid.predictions, pred_valid.label_ids)]
+        # pred_train = [[t[0].tolist()[0], t[1].tolist()] for t in zip(pred_train.predictions, pred_train.label_ids)]
+        pred_valid = [[t[0].tolist()[0], t[1].tolist()] for t in zip(pred_valid.predictions, pred_valid.label_ids)]
 
-        train_txt = tokenizer.batch_decode([item['input_ids'] for item in train_ds],
-                                           skip_special_tokens=True,
-                                           clean_up_tokenization_spaces=True)
+        # train_txt = tokenizer.batch_decode([item['input_ids'] for item in train_ds],
+        #                                    skip_special_tokens=True,
+        #                                    clean_up_tokenization_spaces=True)
 
-        valid_txt = tokenizer.batch_decode([item['input_ids'] for item in valid_ds],
-                                           skip_special_tokens=True,
-                                           clean_up_tokenization_spaces=True)
+        # valid_txt = tokenizer.batch_decode([item['input_ids'] for item in valid_ds],
+        #                                    skip_special_tokens=True,
+        #                                    clean_up_tokenization_spaces=True)
 
         tmp = {
-            'train_pred':
-                [(item[0], item[1]) for item in zip(train_txt, pred_train)],
+            # 'train_pred':
+            #     [(item[0], item[1]) for item in zip(train_txt, pred_train)],
             # do not save augmented
             'valid_pred':
-                [(item[0], item[1]) for item in zip(valid_txt, pred_valid)],
+                [(item[0], item[1]) for item in zip(valid_raw_data, pred_valid)],
         }
         json.dump(tmp, outfile)
 

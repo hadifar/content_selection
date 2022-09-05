@@ -13,29 +13,32 @@ def tokenized_data(all_data, data_args, tokenizer):
     labels = [item[1] for item in all_data]
     return model_inputs, labels
 
-def extract_paragraph_chpaterwise(data, data_args, split, tokenizer):
-    all_data = []
-    for c in data:
-        positive_labels = []
-        for q in c['questions']:
-            for aligned_p in q['aligned_paragraphs']:
-                if aligned_p.get('annotation'):
-                    tmp = [item for item in aligned_p['annotation'].items() if item[1][0] != 'no_support']
-                    if len(tmp) > 0:
-                        positive_labels.append(aligned_p)
 
-        pos_para = set([p['paragraph_num'] for p in positive_labels])
-        neg_para = set(list(range(len(c['tokenized_chapter_text'])))).difference(set(pos_para))
-
-        pos_txt = [(" ".join(" ".join(item) for item in c['tokenized_chapter_text'][pp]), 1) for pp in pos_para]
-        neg_txt = [(" ".join(" ".join(item) for item in c['tokenized_chapter_text'][pp]), 0) for pp in neg_para]
-        neg_txt = sample(neg_txt, len(pos_txt))
-        all_data.append(pos_txt)
-        all_data.append(neg_txt)
-    all_data = list(chain(*all_data))
-    shuffle(all_data)
-    inputs, labels = tokenized_data(all_data, data_args, tokenizer)
-    return CustomDS(inputs, labels)
+#
+# def extract_paragraph_chpaterwise(data, data_args, split, tokenizer):
+#     all_data = []
+#     for c in data:
+#         positive_labels = []
+#         for q in c['questions']:
+#             for aligned_p in q['aligned_paragraphs']:
+#                 if aligned_p.get('annotation'):
+#                     tmp = [item for item in aligned_p['annotation'].items() if item[1][0] != 'no_support']
+#                     if len(tmp) > 0:
+#                         positive_labels.append(aligned_p)
+#
+#         pos_para = set([p['paragraph_num'] for p in positive_labels])
+#         neg_para = set(list(range(len(c['tokenized_chapter_text'])))).difference(set(pos_para))
+#
+#         pos_txt = [(" ".join(" ".join(item) for item in c['tokenized_chapter_text'][pp]), 1) for pp in pos_para]
+#         neg_txt = [(" ".join(" ".join(item) for item in c['tokenized_chapter_text'][pp]), 0) for pp in neg_para]
+#         if split == 'train':
+#             neg_txt = sample(neg_txt, len(pos_txt))
+#         all_data.append(pos_txt)
+#         all_data.append(neg_txt)
+#     all_data = list(chain(*all_data))
+#     shuffle(all_data)
+#     inputs, labels = tokenized_data(all_data, data_args, tokenizer)
+#     return CustomDS(inputs, labels)
 
 def extract_paragraph_pointwise(data, data_args, split, tokenizer):
     all_data = []
@@ -53,13 +56,15 @@ def extract_paragraph_pointwise(data, data_args, split, tokenizer):
 
         pos_txt = [(" ".join(" ".join(item) for item in c['tokenized_chapter_text'][pp]), 1) for pp in pos_para]
         neg_txt = [(" ".join(" ".join(item) for item in c['tokenized_chapter_text'][pp]), 0) for pp in neg_para]
-        neg_txt = sample(neg_txt, len(pos_txt))
+        if split == 'train':
+            neg_txt = sample(neg_txt, len(pos_txt))
         all_data.append(pos_txt)
         all_data.append(neg_txt)
     all_data = list(chain(*all_data))
-    shuffle(all_data)
+    if split == 'train':
+        shuffle(all_data)
     inputs, labels = tokenized_data(all_data, data_args, tokenizer)
-    return CustomDS(inputs, labels)
+    return CustomDS(inputs, labels), all_data
 
 
 def extract_paragraph_chapters(data, data_args, split, tokenizer):
@@ -89,7 +94,7 @@ def extract_paragraph_chapters(data, data_args, split, tokenizer):
 
 def process_data(data, data_args, tknizer, split):
     # if data_args.crf == 0:
-        # return extract_paragraph_chapters(data, data_args, split, tknizer)
+    # return extract_paragraph_chapters(data, data_args, split, tknizer)
     return extract_paragraph_pointwise(data, data_args, split, tknizer)
     # elif data_args.crf == 1:
     #     return extract_paragraph_chapters(data, data_args, split, tknizer)
@@ -111,10 +116,10 @@ def read_data(data_args, tokenizer):
         train_data = train_data[:2]
         valid_data = valid_data[:2]
 
-    train_ds = process_data(train_data, data_args, tokenizer, 'train')
-    valid_ds = process_data(valid_data, data_args, tokenizer, 'valid')
+    train_ds, train_raw_data = process_data(train_data, data_args, tokenizer, 'train')
+    valid_ds, valid_raw_data = process_data(valid_data, data_args, tokenizer, 'valid')
 
-    return train_ds, valid_ds
+    return train_ds, train_raw_data, valid_ds, valid_raw_data
 
 
 class CustomDS(torch.utils.data.Dataset):
