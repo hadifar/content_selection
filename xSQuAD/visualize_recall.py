@@ -7,7 +7,7 @@ from lexrank import LexRank, STOPWORDS
 evaluated_recalls = [1, 3, 5, 10, 15]
 yaxis = [0.0, 0.25, 0.5, 0.75, 1]
 
-with open('../data/qg_valid.json') as inpfile:
+with open('../raw_data/qg_valid.json') as inpfile:
     dataet = json.load(inpfile)
     lexrank = LexRank([item['intro'] + ' ' + item['chapter_text'] for item in dataet], stopwords=STOPWORDS['en'])
 
@@ -26,7 +26,7 @@ for topk in evaluated_recalls:
 print('-' * 50)
 
 print('random')
-df = [item[1] for item in pd.read_csv('../data/rank_v2.csv').groupby('chapter')][0]
+df = [item[1] for item in pd.read_csv('data/rank_v2.csv').groupby('chapter')][0]
 randm_recall = []
 corpus = df['label'].sample(max(evaluated_recalls), random_state=42).values.tolist()
 for topk in evaluated_recalls:
@@ -35,7 +35,7 @@ for topk in evaluated_recalls:
     print('recall@{} --> {}'.format(topk, recall_val))
 
 print('-' * 50)
-df = pd.read_csv('../example/rank_topic_0.9_full.csv')
+df = pd.read_csv('data/rank_topic_0.9_full.csv')
 df = df.sort_values(by='score', ascending=False)
 robert_recall = []
 ground_truth = df.sort_values(by='label', ascending=False)['label'].values

@@ -6,57 +6,18 @@ from tqdm import tqdm
 import argparse
 
 
-# model = SentenceTransformer('all-MiniLM-L6-v2')
+def topic_relevance(doc_current, docs_selected, initial_ranking, topic_distribution_matrix, topic_frequency):
+    n_examples, _ = topic_distribution_matrix.shape
 
-
-# def _build_topic_distribution(initial_ranking):
-#     # Compute embeddings
-#     embeddings = model.encode([item for item in initial_ranking['doc'].tolist()], convert_to_tensor=True)
-#     # Compute cosine-similarities for each sentence with each other sentence
-#     embeddings = embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
-#     embeddings = embeddings.data.numpy()
-#
-#     # gm = GaussianMixture(n_components=2, n_init=10, reg_covar=0.05, random_state=42).fit(embeddings)
-#     #
-#     gm = AutoGMMCluster(min_components=2,
-#                         max_components=10,
-#                         kmeans_n_init=10,
-#                         max_iter=1000,
-#                         # affinity=None,
-#                         # covariance_type='diag',
-#                         # linkage=None,
-#                         random_state=42,
-#                         n_jobs=-1).fit(embeddings)
-#
-#     cluster_prob = gm.predict_proba(embeddings)
-#     # clusters = cluster_prob.argmax(-1)
-#     return pd.DataFrame(cluster_prob)
-#
-
-# def _lookup_rel(initial_ranking, doc):
-#     """Lookup table for relevance."""
-#     return initial_ranking.loc[initial_ranking['doc'] == doc, 'score'].iloc[0]
-# def _lookup_sim(doc1, doc2, sim_matrix, initial_ranking):
-#     """Lookup pairwise similarity."""
-#
-#     doc1_idx = initial_ranking.index[initial_ranking['doc'] == doc1].tolist()[0]
-#     doc2_idx = initial_ranking.index[initial_ranking['doc'] == doc2].tolist()[0]
-#     sim_doc1_doc2 = sim_matrix.iat[doc1_idx, doc2_idx]
-#     return sim_doc1_doc2
-
-
-def topic_relevance(doc_current, docs_selected, initial_ranking, topic_distribution_matrix):
-    n_examples, n_topics = topic_distribution_matrix.shape
-    topic_frequency = np.asarray(np.unique(topic_distribution_matrix.argmax(-1), return_counts=True)).T
     final_score = 0
 
     curr_doc_index = initial_ranking['doc'] == doc_current
     curr_doc_rank_score = initial_ranking[curr_doc_index]['score'].tolist()[0]
     curr_doc_topic_scores = topic_distribution_matrix[initial_ranking.index[curr_doc_index].tolist()[0]]
+
     for tf in topic_frequency:
         topic, freq = tf
         topic_weight = (freq / n_examples)
-        # topic_score_per_doc = 1
 
         topic_importance_for_curr_doc = topic_weight * curr_doc_rank_score * curr_doc_topic_scores[topic]
 
@@ -91,9 +52,14 @@ def _mmr(lambda_score, doc_current, docs_unranked, docs_selected, initial_rankin
     """Compute mmr"""
     mmr = -1
     doc = None
+    topic_frequency = np.asarray(np.unique(topic_score_matrix.argmax(-1), return_counts=True)).T
     for d in docs_unranked:
         # argmax Sim(d_i, d_j)
-        first_score, second_score = topic_relevance(doc_current, docs_selected, initial_ranking, topic_score_matrix)
+        first_score, second_score = topic_relevance(doc_current,
+                                                    docs_selected,
+                                                    initial_ranking,
+                                                    topic_score_matrix,
+                                                    topic_frequency)
         # Sim(d_i, q)
         # relevance = _lookup_rel(initial_ranking, doc_current)
         # print(rel)
@@ -118,7 +84,7 @@ def rank(initial_ranking, lambda_score):
         'doc': initial_ranking['doc'].tolist()[0],
         'mmr': 'top',
         'cluster_scores': topic_distribution_np[0].tolist(),
-        'cluster': topic_distribution_np[0].argmax(-1),
+        'cluster': topic_distribution_np.argmax(),
     }]
 
     print('--- topic frequency ---')
@@ -140,13 +106,13 @@ def rank(initial_ranking, lambda_score):
             topic_distribution_np
         )
 
-        cluster_scores = topic_distribution_np[initial_ranking.index[initial_ranking['doc'] == curr_doc]]
-        cluster = cluster_scores.argmax(-1).tolist()
+        # cluster_scores = topic_distribution_np[initial_ranking.index[initial_ranking['doc'] == curr_doc]]
+        # cluster = cluster_scores.argmax(-1).tolist()
         final_ranking.append(
             {'doc': doc,
              'mmr': mmr_score,
-             'cluster': cluster[0],
-             'cluster_scores': cluster_scores.tolist()[0],
+             # 'cluster': cluster[0],
+             # 'cluster_scores': cluster_scores.tolist()[0],
              }
         )
         docs_unranked.remove(doc)
@@ -162,11 +128,11 @@ def run_exp(initial_ranking, lambda_):
         matched_doc_ = initial_ranking['doc'] == r_doc['doc']
         index_id = initial_ranking.index[matched_doc_].tolist()[0]
 
-        chapter, text, rank_org, label, _ = initial_ranking.values.tolist()[index_id]
+        chapter, text, rank_org, label, cluster_scores = initial_ranking.values.tolist()[index_id]
 
-        chapter_rank.append([chapter, text, rank_org, label, r_doc['mmr'], r_doc['cluster'], r_doc['cluster_scores']])
+        chapter_rank.append([chapter, text, rank_org, label, r_doc['mmr'], cluster_scores])
 
-    cols = ['chapter', 'text', 'score', 'label', 'mmr', 'cluster', 'cluster_scores']
+    cols = ['chapter', 'text', 'score', 'label', 'mmr', 'cluster_scores']
     return pd.DataFrame(chapter_rank, columns=cols)
 
 
@@ -178,7 +144,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     df = pd.read_csv(args.input_file)
-
+    # df['cluster_prob'] = df['cluster_prob'].apply(json.loads)
     df = [item[1].reset_index(drop=True) for item in df.groupby(by='chapter')]
 
     list_of_df = [run_exp(item, args.lambda_score) for item in df[:2]]
