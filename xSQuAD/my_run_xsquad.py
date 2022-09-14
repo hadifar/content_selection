@@ -7,7 +7,7 @@ import argparse
 
 
 def topic_relevance(doc_current, docs_selected, topic_distribution_matrix, topic_frequency):
-    n_examples, _ = topic_distribution_matrix.shape
+    n_examples, total_n_topic = topic_distribution_matrix.shape
     final_score = 0
 
     # curr_doc_index = initial_ranking['doc'] == doc_current
@@ -16,7 +16,8 @@ def topic_relevance(doc_current, docs_selected, topic_distribution_matrix, topic
 
     for tf in topic_frequency:
         topic, freq = tf
-        topic_weight = (freq / n_examples)
+        topic_weight = 1/total_n_topic
+        # topic_weight = (freq / n_examples)
 
         topic_importance_for_curr_doc = topic_weight * curr_doc_rank_score * curr_doc_topic_scores[topic]
 
@@ -47,28 +48,7 @@ def topic_relevance(doc_current, docs_selected, topic_distribution_matrix, topic
     # return sim
 
 
-def _mmr(lambda_score, doc_current, docs_unranked, docs_selected, topic_score_matrix):
-    mmr = -1
-    doc = None
-    topic_frequency = np.asarray(np.unique(topic_score_matrix.argmax(-1), return_counts=True)).T
-    for d in docs_unranked:
-        # argmax Sim(d_i, d_j)
-        pairwise_score, topicwise_score = topic_relevance(doc_current,
-                                                          docs_selected,
-                                                          topic_score_matrix,
-                                                          topic_frequency)
-        # Sim(d_i, q)
-        # relevance = _lookup_rel(initial_ranking, doc_current)
-        # print(rel)
-        mmr_current = (lambda_score * pairwise_score) + ((1 - lambda_score) * topicwise_score)
-        # print(mmr_current)
-        # argmax mmr
-        if mmr_current > mmr:
-            mmr = mmr_current
-            doc = d
-        else:
-            continue
-    return mmr, doc
+# def _mmr(lambda_score, doc_current, docs_unranked, docs_selected, topic_score_matrix):
 
 
 def rank(initial_ranking, lambda_score):
@@ -91,32 +71,42 @@ def rank(initial_ranking, lambda_score):
     docs_unranked = initial_ranking.values[1:].tolist()
     # topic_distribution = topic_distribution
 
-    for curr_doc in tqdm(docs_unranked):
-        mmr_score, doc = _mmr(
-            lambda_score,
-            curr_doc,
-            docs_unranked,
-            final_ranking,
-            # initial_ranking,
-            topic_distribution_np
-        )
+    topic_frequency = np.asarray(np.unique(topic_distribution_np.argmax(-1), return_counts=True)).T
+    while len(final_ranking) != len(initial_ranking):
 
-        # cluster_scores = topic_distribution_np[initial_ranking.index[initial_ranking['doc'] == curr_doc]]
-        # cluster = cluster_scores.argmax(-1).tolist()
+        mmr = -1
+        doc = None
+        for d in docs_unranked:
+            # argmax Sim(d_i, d_j)
+            pairwise_score, topicwise_score = topic_relevance(d,
+                                                              final_ranking,
+                                                              topic_distribution_np,
+                                                              topic_frequency)
+            # Sim(d_i, q)
+            # relevance = _lookup_rel(initial_ranking, doc_current)
+            # print(rel)
+            mmr_current = (lambda_score * pairwise_score) + ((1 - lambda_score) * topicwise_score)
+            # print(mmr_current)
+            # argmax mmr
+            if mmr_current > mmr:
+                mmr = mmr_current
+                doc = d
+
         final_ranking.append(
             {'doc': doc,
-             'mmr': mmr_score,
+             'mmr': mmr,
              # 'cluster': cluster[0],
              # 'cluster_scores': cluster_scores.tolist()[0],
              }
         )
+
         docs_unranked.remove(doc)
-        docs_unranked.append(curr_doc)
 
     return final_ranking
 
 
 def run_exp(initial_ranking, lambda_):
+    initial_ranking['score'] = initial_ranking['score'].rank() / len(initial_ranking)
     ranked_documents = rank(initial_ranking, lambda_)
     # chapter_rank = []
     # for r_doc in ranked_documents:
@@ -133,17 +123,20 @@ def run_exp(initial_ranking, lambda_):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--lambda_score', default=0.5, help='higher value of lambda means less topic diversity')
-    parser.add_argument('--input_file', default='data/rank_v2_sim_0.0.csv')
+    parser.add_argument('--lambda_score', default=1.0, help='higher value of lambda means less topic diversity')
+    parser.add_argument('--input_file', default='data/rank_v2_sim_0.0_20_topics.csv')
     parser.add_argument('--output_file', default='data/rank_topic_1.0_full.csv')
     args = parser.parse_args()
 
-    df = pd.read_csv(args.input_file)
-    df['cluster_prob'] = df['cluster_prob'].apply(json.loads)
-    df = [item[1].reset_index(drop=True) for item in df.groupby(by='chapter')]
+    for i in [0, 0.001, 0.005, 0.1, 0.5, 1]:
+        args.lambda_score = i
+        args.output_file = 'data/rank_topic_{}_full.csv'.format(i)
+        df = pd.read_csv(args.input_file)
+        df['cluster_prob'] = df['cluster_prob'].apply(json.loads)
+        df = [item[1].reset_index(drop=True) for item in df.groupby(by='chapter')]
 
-    list_of_df = [run_exp(item, args.lambda_score) for item in df]
+        list_of_df = [run_exp(item, args.lambda_score) for item in df]
 
-    df = pd.concat(list_of_df)
+        df = pd.concat(list_of_df)
 
-    df.to_csv(args.output_file, index=False)
+        df.to_csv(args.output_file, index=False)

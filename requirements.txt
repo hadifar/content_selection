@@ -15,3 +15,4 @@ nltk
 graspologic==1.0.0
 lexrank
 matplotlib
+textstat

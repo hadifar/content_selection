@@ -35,7 +35,7 @@ for topk in evaluated_recalls:
     print('recall@{} --> {}'.format(topk, recall_val))
 
 print('-' * 50)
-df = pd.read_csv('data/rank_topic_0.9_full.csv')
+df = pd.read_csv('data/sim_0.1/rank_topic_0.9_full.csv')
 df = df.sort_values(by='score', ascending=False)
 robert_recall = []
 ground_truth = df.sort_values(by='label', ascending=False)['label'].values

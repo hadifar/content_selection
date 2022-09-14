@@ -14,6 +14,7 @@ from transformers import (
     HfArgumentParser)
 from transformers.trainer_utils import get_last_checkpoint, set_seed
 
+from MyTrainer import CustomTrainer
 from data_helper import read_data
 from model import RobertaCRF
 
@@ -247,7 +248,8 @@ import numpy as np
 
 def compute_metrics(pred):
     labels = pred.label_ids
-    preds = (pred.predictions > 0.5).astype(int)
+    # preds = (pred.predictions > 0.5).astype(int)
+    preds = pred.predictions.argmax(-1)
     acc = accuracy_score(labels, preds)
     f1 = f1_score(labels, preds)
     return {
@@ -317,7 +319,7 @@ def main(args_file=None):
     if data_args.is_debug_mode == 1:
         print('tokenization finished...')
         config = AutoConfig.from_pretrained(model_args.model_name_or_path)
-        config.num_labels = 1
+        config.num_labels = 2
         config.num_hidden_layers = 2
         config.hidden_size = 32
         # config.intermediate_size = 128
@@ -326,7 +328,7 @@ def main(args_file=None):
     else:
         model = AutoModelForSequenceClassification.from_pretrained(model_args.model_name_or_path,
                                                                    cache_dir=model_args.cache_dir,
-                                                                   num_labels=1)
+                                                                   num_labels=2)
 
     # if num_added_tokens > 0:
     #     model.resize_token_embeddings(new_num_tokens=orig_num_tokens + num_added_tokens)
@@ -340,13 +342,13 @@ def main(args_file=None):
         per_device_train_batch_size=training_args.per_device_train_batch_size,  # batch size per device during training
         per_device_eval_batch_size=training_args.per_device_eval_batch_size,  # batch size for evaluation
         warmup_steps=200,  # number of warmup steps for learning rate scheduler
-        # weight_decay=0.01,  # strength of weight decay
+        weight_decay=0.01,  # strength of weight decay
         logging_dir=logdir,  # directory for storing logs
         # load_best_model_at_end=True,  # load the best model when finished training (default metric is loss)
         # but you can specify `metric_for_best_model` argument to change to accuracy or other metric
         # logging_steps=300,  # log & save weights each logging_steps
         # save_steps=300,
-        metric_for_best_model='eval_accuracy',
+        metric_for_best_model='eval_f1',
         greater_is_better=True,
         save_strategy="no",
         evaluation_strategy="epoch",  # evaluate each `logging_steps`
@@ -354,7 +356,7 @@ def main(args_file=None):
 
     # data_collator = DataCollatorForLanguageModeling(tokenizer, mlm=False)
 
-    trainer = Trainer(
+    trainer = CustomTrainer(
         model=model,  # the instantiated Transformers model to be trained
         args=training_args,  # training arguments, defined above
         tokenizer=tokenizer,
@@ -365,7 +367,7 @@ def main(args_file=None):
     )
 
     trainer.train()
-    trainer.evaluate()
+    # trainer.evaluate()
 
     ######################################################
     ######################################################
@@ -378,7 +380,7 @@ def main(args_file=None):
         # pred_train = trainer.predict(train_ds)
         pred_valid = trainer.predict(valid_ds)
         # pred_train = [[t[0].tolist()[0], t[1].tolist()] for t in zip(pred_train.predictions, pred_train.label_ids)]
-        pred_valid = [[t[0].tolist()[0], t[1].tolist()] for t in zip(pred_valid.predictions, pred_valid.label_ids)]
+        pred_valid = [t.tolist() for t in pred_valid.predictions]
 
         # train_txt = tokenizer.batch_decode([item['input_ids'] for item in train_ds],
         #                                    skip_special_tokens=True,

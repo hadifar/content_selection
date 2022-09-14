@@ -6,7 +6,7 @@ analyze/
 cache/
 
 xSQuAD/data/*
-
+xSQuAD/figs/*
 .vscode
 experiments/
 

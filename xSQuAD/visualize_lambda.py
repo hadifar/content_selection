@@ -33,26 +33,26 @@ from scipy.interpolate import make_interp_spline
 
 # Dataset
 x = np.array([0, 0.1, .2, .3, .4, .5, .6, .7, .8, 0.9, 1])
-y = np.array([10, 20, 30, 35, 45, 50, 70, 80, 85, 90, 95])/100
+y = np.array([22.97, 28.10, 28.30, 28.51, 28.30, 28.46, 28.46, 28.66, 28.46, 28.25, 28.46])/100
+# y = y / y.max(axis=-1)
 
 X_Y_Spline = make_interp_spline(x, y)
 
 # Returns evenly spaced numbers
 # over a specified interval.
-X_ = np.linspace(x.min(), x.max(), 500)
+X_ = np.linspace(x.min(), x.max(), 100)
 Y_ = X_Y_Spline(X_)
 plt.plot(X_, Y_, label='R@10')
 
-
-
 x = np.array([0, 0.1, .2, .3, .4, .5, .6, .7, .8, 0.9, 1])
-y = np.array([100-10, 100-20, 100-30, 100-40, 100-50, 100-60, 100-70, 100-75, 100-80, 100-85, 100-95])/100
+y = np.array([61.60, 59.59, 59.43, 59.44, 59.35, 59.23, 59.25, 59.19, 59.13, 59.04, 59.06])/100
+# y = y / y.max(axis=-1)
 
 X_Y_Spline = make_interp_spline(x, y)
 
 # Returns evenly spaced numbers
 # over a specified interval.
-X_ = np.linspace(x.min(), x.max(), 500)
+X_ = np.linspace(x.min(), x.max(), 100)
 Y_ = X_Y_Spline(X_)
 plt.plot(X_, Y_, label='ADC@10')
 
