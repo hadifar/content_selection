@@ -1,5 +1,4 @@
 import datetime
-import datetime
 import json
 import logging
 import os
@@ -7,8 +6,8 @@ import sys
 from dataclasses import dataclass, field
 from typing import Optional
 
-from sklearn.metrics import accuracy_score, f1_score, precision_recall_fscore_support
-from transformers import AutoTokenizer, TrainingArguments, Trainer, AutoConfig, \
+from sklearn.metrics import accuracy_score, f1_score
+from transformers import AutoTokenizer, TrainingArguments, AutoConfig, \
     AutoModelForSequenceClassification
 from transformers import (
     HfArgumentParser)
@@ -16,7 +15,6 @@ from transformers.trainer_utils import get_last_checkpoint, set_seed
 
 from MyTrainer import CustomTrainer
 from data_helper import read_data
-from model import RobertaCRF
 
 logger = logging.getLogger(__name__)
 
@@ -201,9 +199,6 @@ def set_loggers(training_args):
     return output_dir, log_dir
 
 
-import numpy as np
-
-
 #
 # def compute_metrics(pred):
 #     # *_, ls = pred.label_ids.shape
@@ -373,7 +368,6 @@ def main(args_file=None):
     ######################################################
     # save results on json file
     # np.delete(pred_pred, np.where(pred_pred == -100))
-    from itertools import chain
     # with open(output_dir + '/{}_eval_scores.json'.format(output_dir.split('/')[-1]), 'w') as outfile:
     # save results on json file
     with open(output_dir + '/{}_eval_scores.json'.format(output_dir.split('/')[-1]), 'w') as outfile:
@@ -400,5 +394,6 @@ def main(args_file=None):
         json.dump(tmp, outfile)
 
 
+# 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
 if __name__ == '__main__':
     main()

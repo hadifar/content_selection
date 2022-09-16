@@ -51,23 +51,22 @@ def _mmr(lambda_score, doc_current, docs_unranked, docs_selected, topic_score_ma
     mmr = -1
     doc = None
     topic_frequency = np.asarray(np.unique(topic_score_matrix.argmax(-1), return_counts=True)).T
+
     for d in docs_unranked:
         # argmax Sim(d_i, d_j)
-        pairwise_score, topicwise_score = topic_relevance(doc_current,
-                                                          docs_selected,
-                                                          topic_score_matrix,
-                                                          topic_frequency)
-        # Sim(d_i, q)
-        # relevance = _lookup_rel(initial_ranking, doc_current)
-        # print(rel)
-        mmr_current = (lambda_score * pairwise_score) + ((1 - lambda_score) * topicwise_score)
-        # print(mmr_current)
-        # argmax mmr
+        pointwise_score, topicwise_score = topic_relevance(doc_current,
+                                                           docs_selected,
+                                                           topic_score_matrix,
+                                                           topic_frequency)
+
+        mmr_current = (lambda_score * pointwise_score) + ((1 - lambda_score) * topicwise_score)
+
         if mmr_current > mmr:
             mmr = mmr_current
             doc = d
         else:
             continue
+
     return mmr, doc
 
 
@@ -75,21 +74,13 @@ def rank(initial_ranking, lambda_score):
     """Ranking based on mmr score."""
 
     topic_distribution_np = np.array(initial_ranking['cluster_prob'].tolist())
-    print('--- topic frequency ---')
-    print('-' * 100)
-    for item in zip(*np.unique(topic_distribution_np.argmax(-1), return_counts=True)):
-        print('topic: {} --> freq: {}'.format(item[0], item[1]))
-    print('-' * 100)
 
     final_ranking = [{
         'doc': initial_ranking.values[0].tolist(),
         'mmr': 'top',
-        # 'cluster_scores': topic_distribution_np[0].tolist(),
-        # 'cluster': topic_distribution_np.argmax(),
     }]
 
     docs_unranked = initial_ranking.values[1:].tolist()
-    # topic_distribution = topic_distribution
 
     for curr_doc in tqdm(docs_unranked):
         mmr_score, doc = _mmr(
@@ -116,16 +107,9 @@ def rank(initial_ranking, lambda_score):
     return final_ranking
 
 
-def run_exp(initial_ranking, lambda_):
+def run_exp(initial_ranking, lambda_, chapter_indx):
+    print('chapter {}'.format(chapter_indx))
     ranked_documents = rank(initial_ranking, lambda_)
-    # chapter_rank = []
-    # for r_doc in ranked_documents:
-    #     matched_doc_ = initial_ranking['doc'] == r_doc['doc']
-    #     index_id = initial_ranking.index[matched_doc_].tolist()[0]
-    #
-    #     chapter, text, rank_org, label, cluster_scores = initial_ranking.values.tolist()[index_id]
-    #
-    #     chapter_rank.append([chapter, text, rank_org, label, r_doc['mmr'], cluster_scores])
     ranked_documents = [rdoc_['doc'] + [rdoc_['mmr']] for rdoc_ in ranked_documents]
     cols = ['chapter', 'text', 'score', 'label', 'cluster_scores', 'mmr']
     return pd.DataFrame(ranked_documents, columns=cols)
@@ -133,16 +117,16 @@ def run_exp(initial_ranking, lambda_):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--lambda_score', default=0.5, help='higher value of lambda means less topic diversity')
+    parser.add_argument('--lambda_score', default=0.1, help='higher value of lambda means less topic diversity')
     parser.add_argument('--input_file', default='data/rank_v2_sim_0.0.csv')
-    parser.add_argument('--output_file', default='data/rank_topic_1.0_full.csv')
+    parser.add_argument('--output_file', default='data/rank_topic_0.1_full.csv')
     args = parser.parse_args()
 
     df = pd.read_csv(args.input_file)
     df['cluster_prob'] = df['cluster_prob'].apply(json.loads)
-    df = [item[1].reset_index(drop=True) for item in df.groupby(by='chapter')]
+    df = [item[1].reset_index(drop=True) for item in df.groupby(by='chapter')][24:]
 
-    list_of_df = [run_exp(item, args.lambda_score) for item in df]
+    list_of_df = [run_exp(item, args.lambda_score, i) for i, item in enumerate(df)]
 
     df = pd.concat(list_of_df)
 

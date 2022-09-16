@@ -1,4 +1,5 @@
 import numpy as np
+from graspologic.cluster import AutoGMMCluster
 from sentence_transformers import SentenceTransformer
 
 model = SentenceTransformer('all-MiniLM-L6-v2')
@@ -6,7 +7,7 @@ model = SentenceTransformer('all-MiniLM-L6-v2')
 
 def _build_topic_distribution(initial_ranking):
     # Compute embeddings
-    embeddings = model.encode([item for item in initial_ranking['doc'].tolist()], convert_to_tensor=True)
+    embeddings = model.encode([item for item in initial_ranking['doc'].tolist()],batch_size=1)
     # Compute cosine-similarities for each sentence with each other sentence
     embeddings = embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
     embeddings = embeddings.data.numpy()

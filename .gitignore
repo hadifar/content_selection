@@ -6,7 +6,8 @@ analyze/
 cache/
 
 xSQuAD/data/*
-xSQuAD/figs/*
+xSQuAD/resources/*
+xSQuAD/cached/*
 .vscode
 experiments/
 
@@ -22,4 +23,4 @@ gpt_personachat_cache_v2/
 *.lock
 *.pt
 
-
+clusterings/*.csv

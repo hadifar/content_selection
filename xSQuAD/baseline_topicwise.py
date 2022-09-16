@@ -1,6 +1,6 @@
 import pandas as pd
 
-from xSQuAD.utils import all_eval_metric
+from xSQuAD.metric_fn import eval_df_for_ranking
 
 evaluated_recalls = [10]
 import json
@@ -32,8 +32,8 @@ for value in [0.1]:
 
         # print(df2['cluster_prob'].values)
         for topk in evaluated_recalls:
-            res = all_eval_metric(corpus_label, corpus_text,
-                                  ground_truth, topk)
+            res = eval_df_for_ranking(corpus_label, corpus_text,
+                                      ground_truth, topk)
             recall_v, map_v, adc_v, bleu1_v, bleu2_v, bleu3_v, bleu4_v = res.values()
             if topk == 10:
                 avg_recall_10.append(recall_v)
