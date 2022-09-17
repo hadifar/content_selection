@@ -1,6 +1,5 @@
 import argparse
 import json
-import os
 import random
 
 import nltk.tokenize
@@ -10,33 +9,27 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.pipeline import Pipeline
 from sklearn.svm import SVC
 from textstat import textstat
+from tqdm import tqdm
 
-from xSQuAD.helper_fn import read_json_file, extract_paragraph_pointwise
-from xSQuAD.metric_fn import calculate_ranking_scores
-
-
-def store_ranking(all_df, result_dic, args):
-    folder_dir = os.path.join(args.cache_path, args.method)
-    print('save file in {}'.format(folder_dir))
-    df = pd.concat(all_df)
-    if not os.path.isdir(folder_dir):
-        os.makedirs(folder_dir)
-
-    cache_file = os.path.join(folder_dir, args.method + '.csv')
-    res_file = os.path.join(folder_dir, args.method + '.json')
-    # save rankings
-    df.to_csv(cache_file, index=False)
-    # save results
-    json.dump(result_dic, open(res_file, 'w'), indent=4)
+from xSQuAD.helper_fn import read_json_file, extract_paragraph_pointwise, save_result_on_disk, cache_exist, \
+    pretty_print_results
+from xSQuAD.metric_fn import eval_all_df_ranking_scores
 
 
-def cache_exist(args):
-    cache_file = os.path.join(args.cache_path, args.method, args.method + '.csv')
-    if os.path.isfile(cache_file):
-        all_df = [t[1] for t in pd.read_csv(cache_file).groupby('chapter')]
-        return all_df
-    else:
-        return []
+#
+# def store_ranking(all_df, result_dic, args):
+#     folder_dir = os.path.join(args.cache_path, args.method)
+#     print('save file in {}'.format(folder_dir))
+#     df = pd.concat(all_df)
+#     if not os.path.isdir(folder_dir):
+#         os.makedirs(folder_dir)
+#
+#     cache_file = os.path.join(folder_dir, args.method + '.{}.csv'.format(args.task))
+#     res_file = os.path.join(folder_dir, args.method + '.{}.json'.format(args.task))
+#     # save rankings
+#     df.to_csv(cache_file, index=False)
+#     # save results
+#     json.dump(result_dic, open(res_file, 'w'), indent=4)
 
 
 def load_lexrank(train_file_path):
@@ -58,32 +51,32 @@ def load_svm(train_file_path):
 
 
 def calc_longest(all_df, args):
-    tmp = cache_exist(args)
+    tmp = cache_exist(args.cache_path, args.method, args.task)
     if len(tmp) == 0:
         for df in all_df:
             df['target_score'] = df['text'].apply(str).apply(nltk.tokenize.word_tokenize).apply(len)
             tmp.append(df)
 
-        result_dic = calculate_ranking_scores(tmp, k=args.topk)
-        store_ranking(tmp, result_dic, args)
+        result_dic = eval_all_df_ranking_scores(tmp, k=args.topk)
+        save_result_on_disk(tmp, result_dic, args.cache_path, args.method, args.task)
 
-    pretty_print_results(args)
+    pretty_print_results(args.cache_path, args.method, args.task)
 
 
 def calc_lexrank(all_df, args):
-    tmp = cache_exist(args)
+    tmp = cache_exist(args.cache_path, args.method, args.task)
     if len(tmp) == 0:
         lexrank = load_lexrank(args.train_file_path)
         for df in all_df:
             df['target_score'] = lexrank.rank_sentences([str(v) for v in df['text'].values.tolist()], threshold=0.1)
             tmp.append(df)
-        result_dic = calculate_ranking_scores(tmp, k=args.topk)
-        store_ranking(tmp, result_dic, args)
-    pretty_print_results(args)
+        result_dic = eval_all_df_ranking_scores(tmp, k=args.topk)
+        save_result_on_disk(tmp, result_dic, args.cache_path, args.method, args.task)
+    pretty_print_results(args.cache_path, args.method, args.task)
 
 
 def calc_hardest(all_df, args):
-    tmp = cache_exist(args)
+    tmp = cache_exist(args.cache_path, args.method, args.task)
     if len(tmp) == 0:
         for df in all_df:
             df['target_score'] = [sum([textstat.flesch_reading_ease(str(s)) for s in item]) / len(item) for item in
@@ -91,21 +84,13 @@ def calc_hardest(all_df, args):
             tmp.append(df)
 
         # higher flesch scores means easier to understand
-        results_dic = calculate_ranking_scores(tmp, k=args.topk, ascending=True)
-        store_ranking(tmp, results_dic, args)
-    pretty_print_results(args)
-
-
-def pretty_print_results(args):
-    folder_dir = os.path.join(args.cache_path, args.method)
-    result_file = os.path.join(folder_dir, args.method + '.json')
-    all_results = json.load(open(result_file))
-    for item in all_results.items():
-        print(item)
+        result_dic = eval_all_df_ranking_scores(tmp, k=args.topk, ascending=True)
+        save_result_on_disk(tmp, result_dic, args.cache_path, args.method, args.task)
+    pretty_print_results(args.cache_path, args.method, args.task)
 
 
 def calc_random(all_df, args):
-    tmp = cache_exist(args)
+    tmp = cache_exist(args.cache_path, args.method, args.task)
     if len(tmp) == 0:
         for df in all_df:
             r = list(range(len(df)))
@@ -113,47 +98,46 @@ def calc_random(all_df, args):
             df['target_score'] = r
             tmp.append(df)
 
-        result_dic = calculate_ranking_scores(tmp, k=args.topk)
+        result_dic = eval_all_df_ranking_scores(tmp, k=args.topk)
+        save_result_on_disk(tmp, result_dic, args.cache_path, args.method, args.task)
 
-        store_ranking(tmp, result_dic, args)
-
-    pretty_print_results(args)
+    pretty_print_results(args.cache_path, args.method, args.task)
 
 
 def calc_svm(all_df, args):
-    tmp = cache_exist(args)
+    tmp = cache_exist(args.cache_path, args.method, args.task)
     if len(tmp) == 0:
         svm_pipeline = load_svm(args.train_file_path)
         for df in all_df:
             df['target_score'] = svm_pipeline.predict_proba(df['text'].apply(str).values.tolist())[:, 1]
             tmp.append(df)
 
-        result_dic = calculate_ranking_scores(tmp, k=args.topk)
-        store_ranking(tmp, result_dic, args)
+        result_dic = eval_all_df_ranking_scores(tmp, k=args.topk)
+        save_result_on_disk(tmp, result_dic, args.cache_path, args.method, args.task)
 
-    pretty_print_results(args)
+    pretty_print_results(args.cache_path, args.method, args.task)
 
 
 def calc_robert(all_df, args):
-    tmp = cache_exist(args)
+    tmp = cache_exist(args.cache_path, args.method, args.task)
     if len(tmp) == 0:
         for df in all_df:
             df['target_score'] = df['pred']
             tmp.append(df)
-        result_dic = calculate_ranking_scores(tmp, k=args.topk)
-        store_ranking(tmp, result_dic, args)
-    pretty_print_results(args)
+        result_dic = eval_all_df_ranking_scores(tmp, k=args.topk)
+        save_result_on_disk(tmp, result_dic, args.cache_path, args.method, args.task)
+    pretty_print_results(args.cache_path, args.method, args.task)
 
 
 def calc_ground_truth(all_df, args):
-    tmp = cache_exist(args)
+    tmp = cache_exist(args.cache_path, args.method, args.task)
     if len(tmp) == 0:
-        for df in all_df:
+        for df in tqdm(all_df):
             df['target_score'] = df.sort_values(by='label', ascending=False).rank()['label']
             tmp.append(df)
-        result_dic = calculate_ranking_scores(tmp, args.topk)
-        store_ranking(tmp, result_dic, args)
-    pretty_print_results(args)
+        result_dic = eval_all_df_ranking_scores(tmp, args.topk)
+        save_result_on_disk(tmp, result_dic, args.cache_path, args.method, args.task)
+    pretty_print_results(args.cache_path, args.method, args.task)
 
 
 def calc_topicwise(all_df, topk):
@@ -173,6 +157,7 @@ def load_df_files(ranking_file_path):
 
 def main(args):
     all_df = load_df_files(args.ranking_file_path)
+    print('method of choice : {}'.format(args.method))
 
     if args.method == 'longest':
         calc_longest(all_df, args)
@@ -196,7 +181,8 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--method', type=str, default='roberta')
+    parser.add_argument('--method', type=str, default='svm')
+    parser.add_argument('--task', type=str, default='rank')
     parser.add_argument('--topk', type=int, default=10)
     parser.add_argument('--train_file_path', type=str, default='../raw_data/qg_train.json', )
     parser.add_argument('--valid_file_path', type=str, default='../raw_data/qg_valid.json', )

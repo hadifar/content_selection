@@ -2,8 +2,42 @@ import json
 import random
 from itertools import chain
 from random import sample, shuffle
+import os
+import pandas as pd
 
 random.seed(42)
+
+
+def save_result_on_disk(all_df, result_dic, cache_path, method, task):
+    folder_dir = os.path.join(cache_path, method)
+    print('save file in {}'.format(folder_dir))
+    df = pd.concat(all_df)
+    if not os.path.isdir(folder_dir):
+        os.makedirs(folder_dir)
+
+    cache_file = os.path.join(folder_dir, method + '.{}.csv'.format(task))
+    res_file = os.path.join(folder_dir, method + '.{}.json'.format(task))
+    # save rankings
+    df.to_csv(cache_file, index=False)
+    # save results
+    json.dump(result_dic, open(res_file, 'w'), indent=4)
+
+
+def cache_exist(cache_path, method, task):
+    cache_file = os.path.join(cache_path, method, method + '.{}.csv'.format(task))
+    if os.path.isfile(cache_file):
+        all_df = [t[1] for t in pd.read_csv(cache_file).groupby('chapter')]
+        return all_df
+    else:
+        return []
+
+
+def pretty_print_results(cache_path, method, task):
+    folder_dir = os.path.join(cache_path, method)
+    result_file = os.path.join(folder_dir, method + '.{}.json'.format(task))
+    all_results = json.load(open(result_file))
+    for item in all_results.items():
+        print(item)
 
 
 def read_json_file(file_path):

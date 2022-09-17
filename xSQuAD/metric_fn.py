@@ -7,6 +7,7 @@ import nltk
 import numpy as np
 from nltk.tokenize import word_tokenize
 from nltk.translate.bleu_score import SmoothingFunction
+from nltk.translate.meteor_score import meteor_score
 from nltk.util import ngrams
 from sentence_transformers import SentenceTransformer, util
 from sklearn.metrics import recall_score
@@ -173,7 +174,7 @@ def distinct_ngram_score(a_set_of_tokenized_txt, n=1):
     return len(set(all_possible_ngrams)) / len(all_possible_ngrams)
 
 
-def calculate_ranking_scores(all_df, k=10, ascending=False):
+def eval_all_df_ranking_scores(all_df, k=10, ascending=False):
     avg_recall_10 = []
     avg_map_10 = []
     avg_adc10 = []
@@ -227,33 +228,107 @@ def calculate_ranking_scores(all_df, k=10, ascending=False):
     }
 
 
-def eval_all_metrics_for_generation(corpus_text):
-    adc_val = average_dissimilarity_candidates(corpus_text)
+def eval_all_df_generation_scores(all_dfs, ground_dfs):
+    avg_adc = []
+    avg_selfbleu1 = []
+    avg_selfbleu2 = []
+    avg_selfbleu3 = []
+    avg_selfbleu4 = []
+    avg_distinct1 = []
+    avg_distinct2 = []
+    avg_bleu1 = []
+    avg_bleu2 = []
+    avg_bleu3 = []
+    avg_bleu4 = []
+    avg_meteor = []
 
-    tokeinized_corpus = [word_tokenize(str(s).lower()) for s in corpus_text]
+    for rdf, gdf in zip(all_dfs, ground_dfs):
+        ground_q = gdf['question'].values
+        generated_q = rdf['generation'].values
+        res = eval_df_for_generation(ground_q, generated_q)
+        # res.values()
+        adc, selfbleu1_val, selfbleu2_val, \
+        selfbleu3_val, selfbleu4_val, distinc1, \
+        distinc2, b_val1, b_val2, b_val3, b_val4, meteor = res.values()
 
-    bleu1_val = bleu1.get_bleu_parallel(tokeinized_corpus)
-    bleu2_val = bleu2.get_bleu_parallel(tokeinized_corpus)
-    bleu3_val = bleu3.get_bleu_parallel(tokeinized_corpus)
-    bleu4_val = bleu4.get_bleu_parallel(tokeinized_corpus)
+        avg_adc.append(adc)
 
-    gram1_score = distinct_ngram_score(tokeinized_corpus, 1)
-    gram2_score = distinct_ngram_score(tokeinized_corpus, 2)
+        avg_selfbleu1.append(selfbleu1_val)
+        avg_selfbleu2.append(selfbleu2_val)
+        avg_selfbleu3.append(selfbleu3_val)
+        avg_selfbleu4.append(selfbleu4_val)
 
-    #  evaluate them?
-    res = {
-        'adc': adc_val,
-        'self-blue1': bleu1_val,
-        'self-blue2': bleu2_val,
-        'self-blue3': bleu3_val,
-        'self-blue4': bleu4_val,
-        'distinct1': gram1_score,
-        'distinct2': gram2_score,
+        avg_distinct1.append(distinc1)
+        avg_distinct2.append(distinc2)
+
+        avg_bleu1.append(b_val1)
+        avg_bleu2.append(b_val2)
+        avg_bleu3.append(b_val3)
+        avg_bleu4.append(b_val4)
+
+        avg_meteor.append(meteor)
+
+    avg_adc_v = (sum(avg_adc) / len(avg_adc)) * 100
+
+    avg_selfbleu1_v = (sum(avg_selfbleu1) / len(avg_selfbleu1)) * 100
+    avg_selfbleu2_v = (sum(avg_selfbleu2) / len(avg_selfbleu2)) * 100
+    avg_selfbleu3_v = (sum(avg_selfbleu3) / len(avg_selfbleu3)) * 100
+    avg_selfbleu4_v = (sum(avg_selfbleu4) / len(avg_selfbleu4)) * 100
+
+    avg_bleu1_v = (sum(avg_bleu1) / len(avg_bleu1)) * 100
+    avg_bleu2_v = (sum(avg_bleu2) / len(avg_bleu2)) * 100
+    avg_bleu3_v = (sum(avg_bleu3) / len(avg_bleu3)) * 100
+    avg_bleu4_v = (sum(avg_bleu4) / len(avg_bleu4)) * 100
+
+    avg_dist1 = (sum(avg_distinct1) / len(avg_distinct1)) * 100
+    avg_dist2 = (sum(avg_distinct2) / len(avg_distinct2)) * 100
+
+    avg_meteor_v = (sum(avg_meteor) / len(avg_meteor)) * 100
+
+    return {
+        'adc': avg_adc_v,
+        'avg_selfbleu1': avg_selfbleu1_v,
+        'avg_selfbleu2': avg_selfbleu2_v,
+        'avg_selfbleu3': avg_selfbleu3_v,
+        'avg_selfbleu4': avg_selfbleu4_v,
+
+        'avg_bleu1': avg_bleu1_v,
+        'avg_bleu2': avg_bleu2_v,
+        'avg_bleu3': avg_bleu3_v,
+        'avg_bleu4': avg_bleu4_v,
+
+        'avg_distinct1': avg_dist1,
+        'avg_distinct2': avg_dist2,
+
+        'avg_meteor': avg_meteor_v,
     }
 
-    return res
 
-
+# def eval_all_metrics_for_generation(corpus_text):
+#     adc_val = average_dissimilarity_candidates(corpus_text)
+#
+#     tokeinized_corpus = [word_tokenize(str(s).lower()) for s in corpus_text]
+#
+#     bleu1_val = bleu1.get_bleu_parallel(tokeinized_corpus)
+#     bleu2_val = bleu2.get_bleu_parallel(tokeinized_corpus)
+#     bleu3_val = bleu3.get_bleu_parallel(tokeinized_corpus)
+#     bleu4_val = bleu4.get_bleu_parallel(tokeinized_corpus)
+#
+#     gram1_score = distinct_ngram_score(tokeinized_corpus, 1)
+#     gram2_score = distinct_ngram_score(tokeinized_corpus, 2)
+#
+#     #  evaluate them?
+#     res = {
+#         'adc': adc_val,
+#         'self-blue1': bleu1_val,
+#         'self-blue2': bleu2_val,
+#         'self-blue3': bleu3_val,
+#         'self-blue4': bleu4_val,
+#         'distinct1': gram1_score,
+#         'distinct2': gram2_score,
+#     }
+#
+#     return res
 # def calculate_generation_diversity_scores(all_df):
 #     avg_adc10 = []
 #     avg_bleu1 = []
@@ -276,6 +351,51 @@ def eval_all_metrics_for_generation(corpus_text):
 #         avg_bleu4.append(bleu4_v)
 #         avg_distinct1.append(distinct1)
 #         avg_distinct2.append(distinct2)
+
+def eval_df_for_generation(generated, ground_truth):
+    adc = average_dissimilarity_candidates(generated)
+    tokeinized_corpus = [word_tokenize(str(s).lower()) for s in generated]
+
+    tokenized_references = [word_tokenize(str(s).lower()) for s in ground_truth]
+
+    selfbleu1_val = bleu1.get_bleu_parallel(tokeinized_corpus)
+    selfbleu2_val = bleu2.get_bleu_parallel(tokeinized_corpus)
+    selfbleu3_val = bleu3.get_bleu_parallel(tokeinized_corpus)
+    selfbleu4_val = bleu4.get_bleu_parallel(tokeinized_corpus)
+
+    gram1_score = distinct_ngram_score(tokeinized_corpus, 1)
+    gram2_score = distinct_ngram_score(tokeinized_corpus, 2)
+
+    b_val1 = sum([bleu1.calc_bleu(tokenized_references, g, weight=(1, 0, 0, 0)) for g in tokeinized_corpus])
+    b_val1 = b_val1 / len(tokeinized_corpus)
+
+    b_val2 = sum([bleu2.calc_bleu(tokenized_references, g, weight=(0.5, 0.5, 0, 0)) for g in tokeinized_corpus])
+    b_val2 = b_val2 / len(tokeinized_corpus)
+
+    b_val3 = sum([bleu3.calc_bleu(tokenized_references, g, weight=(1 / 3, 1 / 3, 1 / 3, 0)) for g in tokeinized_corpus])
+    b_val3 = b_val3 / len(tokeinized_corpus)
+
+    b_val4 = sum([bleu3.calc_bleu(tokenized_references, g, weight=(0.25, 0.25, 0.25, 0.25)) for g in tokeinized_corpus])
+    b_val4 = b_val4 / len(tokeinized_corpus)
+
+    meteor = sum([meteor_score(references=ground_truth, hypothesis=g) for g in generated]) / len(generated)
+
+    res = {
+        'adc': adc,
+        'self-bleu1': selfbleu1_val,
+        'self-bleu2': selfbleu2_val,
+        'self-bleu3': selfbleu3_val,
+        'self-bleu4': selfbleu4_val,
+        'distinct1': gram1_score,
+        'distinct2': gram2_score,
+        'bleu1_to_org': b_val1,
+        'bleu2_to_org': b_val2,
+        'bleu3_to_org': b_val3,
+        'bleu4_to_org': b_val4,
+        'meteor': meteor,
+    }
+
+    return res
 
 
 def eval_df_for_ranking(corpus_label, corpus_text, ground_truth, topk):
