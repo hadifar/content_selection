@@ -119,7 +119,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--lambda_score', default=0.05, help='higher value of lambda means less topic diversity')
     parser.add_argument('--input_file', default='data/rank_v3_20_topics_len_threshold_0.csv')
-    parser.add_argument('--output_file', default='data/rank_topic_0.1_full.csv')
+    # parser.add_argument('--output_file', default='data/rank_topic_0.1_full.csv')
     args = parser.parse_args()
 
     df = pd.read_csv(args.input_file)
@@ -130,4 +130,4 @@ if __name__ == "__main__":
 
     df = pd.concat(list_of_df)
 
-    df.to_csv(args.output_file, index=False)
+    df.to_csv('data/rank_topic_based_{}.csv'.format(args.lambda_score), index=False)
