@@ -3,7 +3,7 @@ import os
 
 import pandas as pd
 from helper_fn import save_result_on_disk
-
+from tqdm import tqdm
 from xSQuAD.metric_fn import eval_all_df_generation_scores
 
 from transformers import T5ForConditionalGeneration, T5Tokenizer
@@ -26,7 +26,7 @@ def load_selected_df_ranking(args):
 def do_generation_and_eval(args):
     tmp = []
     ranked_dfs, ground_dfs = load_selected_df_ranking(args)
-    for rdf, gdf in zip(ranked_dfs, ground_dfs):
+    for rdf, gdf in tqdm(zip(ranked_dfs, ground_dfs)):
         gen_df = []
         for ctx in rdf['text'].apply(str).tolist():
             input_ids = tokenizer(ctx, return_tensors="pt").input_ids
@@ -47,7 +47,7 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--method', type=str, default='random')
+    parser.add_argument('--method', type=str, default='roberta')
     parser.add_argument('--task', type=str, default='generation')
     parser.add_argument('--qg_pairs', type=str, default='raw_data/qg_ground_question_context_pairs.csv')
     # parser.add_argument('--train_file_path', type=str, default='../raw_data/qg_train.json', )

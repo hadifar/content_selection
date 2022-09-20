@@ -117,14 +117,14 @@ def run_exp(initial_ranking, lambda_, chapter_indx):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--lambda_score', default=0.1, help='higher value of lambda means less topic diversity')
-    parser.add_argument('--input_file', default='data/rank_v2_sim_0.0.csv')
+    parser.add_argument('--lambda_score', default=0.05, help='higher value of lambda means less topic diversity')
+    parser.add_argument('--input_file', default='data/rank_v3_20_topics_len_threshold_0.csv')
     parser.add_argument('--output_file', default='data/rank_topic_0.1_full.csv')
     args = parser.parse_args()
 
     df = pd.read_csv(args.input_file)
     df['cluster_prob'] = df['cluster_prob'].apply(json.loads)
-    df = [item[1].reset_index(drop=True) for item in df.groupby(by='chapter')][24:]
+    df = [item[1].reset_index(drop=True) for item in df.groupby(by='chapter')]
 
     list_of_df = [run_exp(item, args.lambda_score, i) for i, item in enumerate(df)]
 

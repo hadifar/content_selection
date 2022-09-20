@@ -244,8 +244,8 @@ def eval_all_df_generation_scores(all_dfs, ground_dfs):
 
     for rdf, gdf in zip(all_dfs, ground_dfs):
         ground_q = gdf['question'].values
-        generated_q = rdf['generation'].values
-        res = eval_df_for_generation(ground_q, generated_q)
+        generated_q = rdf['generated_by_model'].values
+        res = eval_df_for_generation(generated=generated_q, ground_truth=ground_q)
         # res.values()
         adc, selfbleu1_val, selfbleu2_val, \
         selfbleu3_val, selfbleu4_val, distinc1, \

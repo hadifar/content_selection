@@ -68,7 +68,7 @@ def calc_lexrank(all_df, args):
     if len(tmp) == 0:
         lexrank = load_lexrank(args.train_file_path)
         for df in all_df:
-            df['target_score'] = lexrank.rank_sentences([str(v) for v in df['text'].values.tolist()], threshold=0.1)
+            df['target_score'] = lexrank.rank_sentences([str(v) for v in df['text'].values.tolist()], threshold=0.2)
             tmp.append(df)
         result_dic = eval_all_df_ranking_scores(tmp, k=args.topk)
         save_result_on_disk(tmp, result_dic, args.cache_path, args.method, args.task)
@@ -181,7 +181,7 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--method', type=str, default='svm')
+    parser.add_argument('--method', type=str, default='roberta')
     parser.add_argument('--task', type=str, default='rank')
     parser.add_argument('--topk', type=int, default=10)
     parser.add_argument('--train_file_path', type=str, default='../raw_data/qg_train.json', )
