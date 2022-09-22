@@ -54,7 +54,7 @@ def _mmr(lambda_score, doc_current, docs_unranked, docs_selected, topic_score_ma
 
     for d in docs_unranked:
         # argmax Sim(d_i, d_j)
-        pointwise_score, topicwise_score = topic_relevance(doc_current,
+        pointwise_score, topicwise_score = topic_relevance(d,
                                                            docs_selected,
                                                            topic_score_matrix,
                                                            topic_frequency)
@@ -84,12 +84,11 @@ def rank(initial_ranking, lambda_score):
 
     for curr_doc in tqdm(docs_unranked):
         mmr_score, doc = _mmr(
-            lambda_score,
-            curr_doc,
-            docs_unranked,
-            final_ranking,
-            # initial_ranking,
-            topic_distribution_np
+            lambda_score=lambda_score,
+            doc_current=curr_doc,
+            docs_unranked=docs_unranked,
+            docs_selected=final_ranking,
+            topic_score_matrix=topic_distribution_np,
         )
 
         # cluster_scores = topic_distribution_np[initial_ranking.index[initial_ranking['doc'] == curr_doc]]
@@ -109,6 +108,9 @@ def rank(initial_ranking, lambda_score):
 
 def run_exp(initial_ranking, lambda_, chapter_indx):
     print('chapter {}'.format(chapter_indx))
+    # initial_ranking = initial_ranking.drop(columns=['covariance_type', 'linkage', 'n_components', 'affinity'])
+    initial_ranking['score'] = initial_ranking['score'].rank() / len(initial_ranking)
+    initial_ranking = initial_ranking.reset_index(drop=True)
     ranked_documents = rank(initial_ranking, lambda_)
     ranked_documents = [rdoc_['doc'] + [rdoc_['mmr']] for rdoc_ in ranked_documents]
     cols = ['chapter', 'text', 'score', 'label', 'cluster_scores', 'mmr']
@@ -117,17 +119,18 @@ def run_exp(initial_ranking, lambda_, chapter_indx):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--lambda_score', default=0.05, help='higher value of lambda means less topic diversity')
-    parser.add_argument('--input_file', default='data/rank_v3_20_topics_len_threshold_0.csv')
+    parser.add_argument('--lambda_score', default=1.0, help='higher value of lambda means less topic diversity')
+    parser.add_argument('--input_file', default='data/rank_v3_20_topics_len_threshold_25.csv')
     # parser.add_argument('--output_file', default='data/rank_topic_0.1_full.csv')
     args = parser.parse_args()
+    for v in [0.01, 0.001, 0.0001, 0.05, 0.005, 0.0005, 0.09, 0.009, 0.0009]:
+        args.lambda_score = v
+        df = pd.read_csv(args.input_file)
+        df['cluster_prob'] = df['cluster_prob'].apply(json.loads)
+        df = [item[1] for item in df.groupby(by='chapter')]
 
-    df = pd.read_csv(args.input_file)
-    df['cluster_prob'] = df['cluster_prob'].apply(json.loads)
-    df = [item[1].reset_index(drop=True) for item in df.groupby(by='chapter')]
+        list_of_df = [run_exp(item, args.lambda_score, i) for i, item in enumerate(df)]
 
-    list_of_df = [run_exp(item, args.lambda_score, i) for i, item in enumerate(df)]
+        df = pd.concat(list_of_df)
 
-    df = pd.concat(list_of_df)
-
-    df.to_csv('data/rank_topic_based_{}.csv'.format(args.lambda_score), index=False)
+        df.to_csv('data/rank_topic_based_{}_len25.csv'.format(args.lambda_score), index=False)

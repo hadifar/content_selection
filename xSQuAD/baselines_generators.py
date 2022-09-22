@@ -47,12 +47,15 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--method', type=str, default='roberta')
+    parser.add_argument('--method', type=str, default='topicwise_l0.0')
     parser.add_argument('--task', type=str, default='generation')
-    parser.add_argument('--qg_pairs', type=str, default='raw_data/qg_ground_question_context_pairs.csv')
+    parser.add_argument('--qg_pairs', type=str, default='../raw_data/qg_ground_question_context_pairs.csv')
     # parser.add_argument('--train_file_path', type=str, default='../raw_data/qg_train.json', )
     # parser.add_argument('--valid_file_path', type=str, default='../raw_data/qg_valid.json', )
     # parser.add_argument('--ranking_file_path', type=str, default='data/rank_v3.csv', )
-    parser.add_argument('--cache_path', type=str, default='xSQuAD/cached/', )
-
-    main(parser.parse_args())
+    parser.add_argument('--cache_path', type=str, default='../xSQuAD/cached/', )
+    args = parser.parse_args()
+    for v in [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 0.01, 0.001, 0.0001, 0.05, 0.005, 0.0005, 0.09,
+              0.009, 0.0009]:
+        args.method = "topicwise_l{}".format(v)
+        main(args)

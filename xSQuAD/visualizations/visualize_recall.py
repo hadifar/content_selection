@@ -7,7 +7,7 @@ from lexrank import LexRank, STOPWORDS
 evaluated_recalls = [1, 3, 5, 10, 15]
 yaxis = [0.0, 0.25, 0.5, 0.75, 1]
 
-with open('../../raw_data/qg_valid.json') as inpfile:
+with open('../../raw_data/openstax/qg_valid.json') as inpfile:
     dataet = json.load(inpfile)
     lexrank = LexRank([item['intro'] + ' ' + item['chapter_text'] for item in dataet], stopwords=STOPWORDS['en'])
 

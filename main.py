@@ -13,7 +13,7 @@ from transformers import (
     HfArgumentParser)
 from transformers.trainer_utils import get_last_checkpoint, set_seed
 
-from MyTrainer import CustomTrainer
+from trainer import CustomTrainer
 from data_helper import read_data
 
 logger = logging.getLogger(__name__)
@@ -58,32 +58,19 @@ class DataTrainingArguments:
         default='raw_data/qg_valid.json',
         metadata={"help": "Path for cached valid dataset"},
     )
-    data_dir: Optional[str] = field(
-        default=None,
-        metadata={"help": "Path for data files"},
-    )
+
     task: Optional[str] = field(
-        default='paragraph_selection',
+        default='openstax_paragraph_selection',
         metadata={
-            "help": "cloze2normal, normal2cloze, multi, qg"},
+            "help": "openstax_paragraph_selection,"
+                    "tqa_paragraph_selection,"
+                    "openstax_question_selection,"
+                    "tqa_question_selection"},
     )
 
-    answer_aware: Optional[int] = field(
-        default=0,
-        metadata={"help": 'include answer during training?'},
-    )
-
-    qg_format: Optional[str] = field(
-        default='highlight_qg_format',
-        metadata={"help": "How to format inputs for que generation, 'highlight_qg_format' or 'prepend_qg_format'"},
-    )
     max_source_length: Optional[int] = field(
         default=512,
         metadata={"help": "Max input length for the source text"},
-    )
-    max_target_length: Optional[int] = field(
-        default=48,
-        metadata={"help": "Max input length for the target text"},
     )
 
     is_debug_mode: Optional[int] = field(
@@ -148,19 +135,12 @@ class DataTrainingArguments:
         },
     )
 
-    # crf: Optional[int] = field(
-    #     default=1,
-    #     metadata={
-    #         "help": ("content selection as a sequence labeling problem")
-    #     },
-    # )
 
-
-def set_loggers(training_args):
+def set_loggers(training_args, data_args):
     time = datetime.datetime.now()
 
-    output_dir = "./results/results_{}_{}_{}_{}_ep{}_lr{}_seed{}".format(
-        # training_args.task,
+    output_dir = "./results/results_{}_{}_{}_{}_{}_ep{}_lr{}_seed{}".format(
+        data_args.task,
         time.month,
         time.day,
         time.hour,
@@ -279,7 +259,7 @@ def main(args_file=None):
         )
 
     # set seed & init logger
-    output_dir, logdir = set_loggers(training_args)
+    output_dir, logdir = set_loggers(training_args, data_args)
 
     # Detecting last checkpoint.
     last_checkpoint = None
@@ -311,6 +291,7 @@ def main(args_file=None):
     # num_added_tokens = tokenizer.add_special_tokens(ATTR_TO_SPECIAL_TOKEN)
 
     train_ds, _, valid_ds, valid_raw_data = read_data(data_args, tokenizer)
+
     if data_args.is_debug_mode == 1:
         print('tokenization finished...')
         config = AutoConfig.from_pretrained(model_args.model_name_or_path)

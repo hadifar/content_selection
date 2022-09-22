@@ -1,3 +1,6 @@
+raw_data/tqa/preprocessing/*.json
+raw_data/tqa/preprocessing/*.csv
+
 env/
 results/
 wandb/

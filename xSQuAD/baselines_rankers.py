@@ -122,7 +122,7 @@ def calc_robert(all_df, args):
     tmp = cache_exist(args.cache_path, args.method, args.task)
     if len(tmp) == 0:
         for df in all_df:
-            df['target_score'] = df['pred']
+            df['target_score'] = df['score']
             tmp.append(df)
         result_dic = eval_all_df_ranking_scores(tmp, k=args.topk)
         save_result_on_disk(tmp, result_dic, args.cache_path, args.method, args.task)
@@ -140,14 +140,16 @@ def calc_ground_truth(all_df, args):
     pretty_print_results(args.cache_path, args.method, args.task)
 
 
-def calc_topicwise(all_df, topk):
-    pass
-
-    # tmp = []
-    # for df in all_df:
-    #     df['target_score'] = df.sort_values(by='mmr', ascending=False)
-    #     tmp.append(df)
-    # calculate_ranking_diversity_scores(tmp, topk)
+def calc_topicwise(all_df, args):
+    args.method = "{}_l{}".format(args.method, args.lambda_score)
+    tmp = cache_exist(args.cache_path, args.method, args.task)
+    if len(tmp) == 0:
+        for df in all_df:
+            df['target_score'] = df['mmr']
+            tmp.append(df)
+        result_dic = eval_all_df_ranking_scores(tmp, k=args.topk)
+        save_result_on_disk(tmp, result_dic, args.cache_path, args.method, args.task)
+    pretty_print_results(args.cache_path, args.method, args.task)
 
 
 def load_df_files(ranking_file_path):
@@ -156,6 +158,7 @@ def load_df_files(ranking_file_path):
 
 
 def main(args):
+    args.ranking_file_path = 'data/rank_topic_based_{}_len25.csv'.format(args.lambda_score)
     all_df = load_df_files(args.ranking_file_path)
     print('method of choice : {}'.format(args.method))
 
@@ -181,12 +184,17 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--method', type=str, default='roberta')
+    parser.add_argument('--method', type=str, default='topicwise')
     parser.add_argument('--task', type=str, default='rank')
     parser.add_argument('--topk', type=int, default=10)
+    parser.add_argument('--lambda_score', type=float, default=1.0)
     parser.add_argument('--train_file_path', type=str, default='../raw_data/qg_train.json', )
     parser.add_argument('--valid_file_path', type=str, default='../raw_data/qg_valid.json', )
-    parser.add_argument('--ranking_file_path', type=str, default='data/rank_v3.csv', )
-    parser.add_argument('--cache_path', type=str, default='cached/', )
+    # parser.add_argument('--ranking_file_path', type=str, default='data/rank_topic_based_0.0.csv')
+    parser.add_argument('--cache_path', type=str, default='cached/')
+    args = parser.parse_args()
 
-    main(parser.parse_args())
+    for v in [0.01,0.001,0.0001,0.05,0.005,0.0005,0.09,0.009,0.0009]:
+        args.lambda_score = v
+        args.method = 'topicwise'
+        main(args)
