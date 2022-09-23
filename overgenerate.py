@@ -20,7 +20,7 @@ def main(arg):
         tmp = [[q['question']['question_text'], 1] for q in chapter['questions']]  # label 1 for ground_truth
         df = pd.DataFrame()
         paragraphs = chapter['chapter_text'].split('\n\n')
-        paragraphs = sample(paragraphs, len(tmp) * 2)
+        paragraphs = sample(paragraphs, len(tmp))
         for ctx in paragraphs:
             encoding = tokenizer(ctx, return_tensors="pt")
             with torch.no_grad():

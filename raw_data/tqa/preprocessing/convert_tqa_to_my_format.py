@@ -18,8 +18,8 @@ def preprocess(chapter_list_contxt):
         if len(valid_parantetis) != 0:
             for v in valid_parantetis:
                 c = c.replace(v, '')
-
-        new_chapter_list.append(c)
+        if c and c != '' and " ".join(c.split()) != ' ':
+            new_chapter_list.append(c)
     return new_chapter_list
 
 
@@ -118,6 +118,7 @@ def find_sentence_in_Text(row, chapter_list_contxt):
         matched_sen = matched_sentece(candidate_[0], span_txt)
         return candidate_, span_txt, matched_sen
 
+    print('fuck')
     return candidate_, span_txt, []
 
 
@@ -125,43 +126,55 @@ def find_sentence_in_Text(row, chapter_list_contxt):
 #     find_paragraph = [item for item in alist_of_paragraph if item.find(s) != -1]
 #     return find_paragraph
 
+for target in ['v2_test', 'v1_val', 'v1_train']:
+    print('process file -->', target)
+    list_of_all = []
+    with open('tqa_{}.json'.format(target)) as inpfile:
+        dataset = json.load(inpfile)
+        # print(dataset)
+        for d in dataset:
+            # sub_df = df[df['lessonName'] == d['lessonName']]
+            chapter = []
+            sub_df = df[df["LessonId"] == d['globalID']]
+            if len(sub_df) != 0:
+                chapter_text_list = [c.get('content').get('text') for c in d['topics'].values() if c.get(
+                    'content')]
+                                    #todo: the logic will not work if you uncomment this line becuse of error in preprocessing
 
-list_of_all = []
-with open('tqa_v1_train.json') as inpfile:
-    dataset = json.load(inpfile)
-    # print(dataset)
-    for d in dataset:
-        # sub_df = df[df['lessonName'] == d['lessonName']]
-        chapter = []
-        sub_df = df[df["LessonId"] == d['globalID']]
-        if len(sub_df) != 0:
-            chapter_text_list = [c.get('content').get('text') for c in d['topics'].values() if c.get(
-                'content')] # + [c.get('content').get('text') for c in d['adjunctTopics'].values() if c.get('content')]
-            chapter_text_list = preprocess(chapter_text_list)
-            for row in sub_df.iterrows():
-                ground_paragraph, span_txt, matched_ = find_sentence_in_Text(row, chapter_text_list)
+                                    #+ [c.get('content').get('text') for c in d['adjunctTopics'].values() if
+                                  # c.get('content')]
+                chapter_text_list = preprocess(chapter_text_list)
+                for row in sub_df.iterrows():
+                    ground_paragraph, span_txt, matched_ = find_sentence_in_Text(row, chapter_text_list)
 
-                paragraph_id = [i for i, item in enumerate(chapter_text_list) if item == ground_paragraph[0]][0]
-                question_txt = row[1]['QuestionText']
+                    paragraph_id = [i for i, item in enumerate(chapter_text_list) if item == ground_paragraph[0]][0]
+                    question_txt = row[1]['QuestionText']
 
-                q_obj = {
-                    'question_text': question_txt,
-                    'ground_paragraph': paragraph_id,
-                    'ground_sentence': matched_,
-                    'choices': row[1]['AnswerCandidate'],
-                    'answer_span': row[1]['CorrectAnswerSpan'],
-                }
+                    q_obj = {
+                        'question_text': question_txt,
+                        'ground_paragraph': paragraph_id,
+                        'ground_sentence': matched_,
+                        'choices': row[1]['AnswerCandidate'],
+                        'answer_span': row[1]['CorrectAnswerSpan'],
+                    }
 
-                chapter.append(q_obj)
-            if len(chapter) != 0:
-                c_obj = {
-                    'questions': chapter,
-                    'chapter_id': d['globalID'],
-                    'lesson_name': d['lessonName'],
-                    'chapter_text_list': chapter_text_list
-                }
-                list_of_all.append(c_obj)
+                    chapter.append(q_obj)
+                if len(chapter) != 0:
+                    c_obj = {
+                        'questions': chapter,
+                        'chapter_id': d['globalID'],
+                        'lesson_name': d['lessonName'],
+                        'chapter_text_list': chapter_text_list
+                    }
+                    list_of_all.append(c_obj)
 
-# print(list_of_all)
-with open('/raw_data/tqa/mTQA_train.json', 'w') as outfile:
-    json.dump(list_of_all, outfile)
+    # print(list_of_all)
+    with open('../mTQA_{}.json'.format(target).replace('v1_', '').replace('v2_', ''), 'w') as outfile:
+        json.dump(list_of_all, outfile)
+
+print('merge files ...')
+with open('../mTQA_train.json') as inpfile, open('../mTQA_val.json') as inpfile2, open('../mTQA_train_valid.json',
+                                                                                       'w') as outfile:
+    l1, l2 = json.load(inpfile), json.load(inpfile2)
+    l3 = l1 + l2
+    json.dump(l3, outfile)
