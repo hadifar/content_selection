@@ -33,7 +33,7 @@ def extract_paragraph_from_openstax(data, data_args, split, tokenizer):
         pos_txt = [(" ".join(" ".join(item) for item in c['tokenized_chapter_text'][pp]), 1) for pp in pos_para]
         neg_txt = [(" ".join(" ".join(item) for item in c['tokenized_chapter_text'][pp]), 0) for pp in neg_para]
         if split == 'train':
-            neg_txt = _sample_nagatives(pos_txt, neg_txt, factor=2)
+            neg_txt = _sample_negatives(pos_txt, neg_txt, factor=2)
         all_data.append(pos_txt)
         all_data.append(neg_txt)
     all_data = list(chain(*all_data))
@@ -43,19 +43,20 @@ def extract_paragraph_from_openstax(data, data_args, split, tokenizer):
     return CustomDS(inputs, labels), all_data
 
 
-def _sample_nagatives(pos_sample, neg_sample, factor=2):
+def _sample_negatives(pos_sample, neg_sample, factor=2):
     """A naive negative sampling"""
-    return sample(neg_sample, k=min(len(pos_sample) * factor, len(neg_sample)))
+    k = min(len(pos_sample) * factor, len(neg_sample))
+    return sample(neg_sample, k=k)
 
 
 def extract_question_from_openstax(data, data_args, split, tknizer):
     all_data = []
     for sub_df in data:
         sub_df = sub_df.drop(columns='chapter')
-        positive_questions = sub_df[sub_df['label'] == 1].values.tolist()
-        negative_questions = sub_df[sub_df['label'] == 0].values.tolist()
+        positive_questions = sub_df[sub_df['label'] == 0].dropna().values.tolist()
+        negative_questions = sub_df[sub_df['label'] == 0].dropna().values.tolist()
         if split == 'train':
-            negative_questions = _sample_nagatives(positive_questions, negative_questions, factor=2)
+            negative_questions = _sample_negatives(positive_questions, negative_questions, factor=1)
 
         all_data.append(positive_questions)
         all_data.append(negative_questions)
@@ -70,7 +71,7 @@ def extract_question_from_openstax(data, data_args, split, tknizer):
 def extract_paragraph_from_tqa(data, data_args, split, tokenizer):
     all_data = []
     for c in data:
-        positive_labels = [s['ground_sentence'] for s in c['questions']]
+        positive_labels = list(set([s['ground_sentence'] for s in c['questions']]))
         all_sentences = list(chain(*[nltk.tokenize.sent_tokenize(p) for p in c['chapter_text_list']]))
         negative_labels = [s for s in all_sentences if s not in positive_labels]
 
@@ -78,7 +79,7 @@ def extract_paragraph_from_tqa(data, data_args, split, tokenizer):
         neg_para = [(nl, 0) for nl in negative_labels]
 
         if split == "train":
-            neg_para = _sample_nagatives(pos_para, neg_para, factor=2)
+            neg_para = _sample_negatives(pos_para, neg_para, factor=1)
             # sample(neg_para, k=min(len(pos_para) * 2, len(neg_para)))
 
         all_data.append(pos_para)
@@ -101,7 +102,7 @@ def process_data(data, data_args, tknizer, split):
     elif data_args.task == 'tqa_question_selection':
         return
     else:
-        raise Exception('fuck')
+        raise Exception('task not found ...')
 
 
 def read_json_file(file_path):
@@ -155,8 +156,8 @@ class CustomDS(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         item = {k: torch.tensor(v[idx]) for k, v in self.encodings.items()}
         if self.labels is not None:
-            item["label"] = torch.tensor(self.labels[idx])
-            # item["label"] = torch.tensor(self.labels[idx], dtype=torch.float)
+            # item["label"] = torch.tensor(self.labels[idx])
+            item["label"] = torch.tensor(self.labels[idx], dtype=torch.float)
         return item
 
     def __len__(self):
